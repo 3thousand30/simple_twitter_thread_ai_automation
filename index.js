@@ -418,7 +418,7 @@ async function postThread(tweets, apiKey, apiSecret, accessToken, accessTokenSec
 
     // Short delay between thread tweets (skip after last)
     if (i < tweets.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
   }
 
