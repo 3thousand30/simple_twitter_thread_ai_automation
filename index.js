@@ -281,27 +281,27 @@ async function generateThread(mainTheme, subTheme, themeDescription, sampleThrea
 
   try {
     const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
+      'https://api.deepseek.com/v1/chat/completions',
       {
-        model: 'claude-haiku-4-5-20251001',
+        model: 'deepseek-chat',
         max_tokens: 1500,
         messages: [
           {
             role: 'user',
             content: prompt
           }
-        ]
+        ],
+        temperature: 0.8
       },
       {
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Authorization': `Bearer ${apiKey}`
         }
       }
     );
 
-    return extractThread(response.data.content[0].text);
+    return extractThread(response.data.choices[0].message.content);
   } catch (error) {
     console.error('Error generating thread with AI:', error);
     throw error;
