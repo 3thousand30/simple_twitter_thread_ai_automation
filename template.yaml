@@ -1,0 +1,104 @@
+# template.yaml - AWS SAM template for deployment
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'AI-powered Twitter/X thread posting agent'
+
+Parameters:
+  SecretName:
+    Type: String
+    Default: 'thread-bot-secrets'
+    Description: 'Name of the secret in AWS Secrets Manager'
+
+  ScheduleRate:
+    Type: String
+    Default: 'rate(5 hours)'
+    Description: 'How often to run the bot (default: every 5 hours for ~5 executions per day)'
+
+Globals:
+  Function:
+    Timeout: 300
+    Runtime: nodejs22.x
+    Environment:
+      Variables:
+        SECRET_NAME: !Ref SecretName
+        STATE_TABLE: !Ref StateTable
+        SAMPLE_THREADS_TABLE: !Ref SampleThreadsTable
+
+Resources:
+  # Lambda Function
+  ThreadBotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: twitter-thread-agent
+      CodeUri: ./
+      Handler: index.handler
+      MemorySize: 256
+      Events:
+        ScheduledExecution:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref ScheduleRate
+            Description: 'Trigger thread bot execution'
+            Enabled: true
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StateTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SampleThreadsTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'secretsmanager:GetSecretValue'
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}*'
+
+  # DynamoDB Tables
+  StateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ThreadBotState
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  SampleThreadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ThreadBotSampleThreads
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  # CloudWatch Log Group
+  ThreadBotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ThreadBotFunction}'
+      RetentionInDays: 14
+
+Outputs:
+  ThreadBotFunctionArn:
+    Description: 'Thread Bot Lambda Function ARN'
+    Value: !GetAtt ThreadBotFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ThreadBotFunctionArn'
+
+  StateTableName:
+    Description: 'DynamoDB State Table Name'
+    Value: !Ref StateTable
+    Export:
+      Name: !Sub '${AWS::StackName}-StateTable'
+
+  SampleThreadsTableName:
+    Description: 'DynamoDB Sample Threads Table Name'
+    Value: !Ref SampleThreadsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-SampleThreadsTable'
